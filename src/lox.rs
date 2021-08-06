@@ -5,7 +5,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use crate::scanner::Scanner;
+use crate::{parser::Parser, scanner::Scanner, token::Token, token_type::TokenType};
 
 static HAD_ERROR: AtomicBool = AtomicBool::new(false);
 
@@ -69,9 +69,11 @@ fn run(src: &str) {
 
     let tokens = scanner.scan_tokens();
 
-    for token in &tokens {
-        println!("{}", token);
-    }
+    let mut parser = Parser::new(tokens.clone());
+
+    let ast = parser.parse();
+
+    println!("{:?}", ast.unwrap());
 }
 
 pub fn error(line: usize, message: &str) {
@@ -82,6 +84,14 @@ fn report(line: usize, where_: &str, message: &str) {
     println!("[line {}] Error{}: {}", line, where_, message);
 
     set_had_error(true);
+}
+
+pub fn parse_error(token: Token, message: &str) {
+    if token.token_type == TokenType::Eof {
+        report(token.line, " at end", message)
+    } else {
+        report(token.line, &format!(" at '{}'", token.lexeme), message)
+    }
 }
 
 fn had_error() -> bool {

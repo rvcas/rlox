@@ -1,17 +1,22 @@
 use std::fmt::Display;
 
-use crate::token_type::TokenType;
+use crate::{lox_type::LoxType, token_type::TokenType};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Token {
-    token_type: TokenType,
-    lexeme: String,
-    literal: Literal,
-    line: usize,
+    pub token_type: TokenType,
+    pub lexeme: String,
+    pub literal: Option<LoxType>,
+    pub line: usize,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, lexeme: String, literal: Literal, line: usize) -> Self {
+    pub fn new(
+        token_type: TokenType,
+        lexeme: String,
+        literal: Option<LoxType>,
+        line: usize,
+    ) -> Self {
         Self {
             token_type,
             lexeme,
@@ -29,11 +34,4 @@ impl Display for Token {
             self.token_type, self.lexeme, self.literal
         )
     }
-}
-
-#[derive(Clone, Debug)]
-pub enum Literal {
-    Number(f64),
-    String(String),
-    None,
 }

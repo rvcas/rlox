@@ -1,10 +1,6 @@
 use std::{clone::Clone, collections::HashMap, iter::Peekable, str::Chars};
 
-use crate::{
-    lox,
-    token::{Literal, Token},
-    token_type::TokenType,
-};
+use crate::{lox, lox_type::LoxType, token::Token, token_type::TokenType};
 
 pub struct Scanner<'a> {
     source: String,
@@ -55,7 +51,7 @@ impl<'a> Scanner<'a> {
             self.scan_token();
         }
 
-        let end_token = Token::new(TokenType::Eof, String::new(), Literal::None, self.line);
+        let end_token = Token::new(TokenType::Eof, String::new(), None, self.line);
 
         self.tokens.push(end_token);
 
@@ -166,7 +162,7 @@ impl<'a> Scanner<'a> {
 
         let value: f64 = self.source[self.start..self.current].parse().unwrap();
 
-        self.add_token_with_literal(TokenType::Number, Literal::Number(value));
+        self.add_token_with_literal(TokenType::Number, Some(LoxType::Number(value)));
     }
 
     fn string(&mut self) {
@@ -188,7 +184,7 @@ impl<'a> Scanner<'a> {
 
         let value = self.source[(self.start + 1)..(self.current - 1)].to_string();
 
-        self.add_token_with_literal(TokenType::String, Literal::String(value));
+        self.add_token_with_literal(TokenType::String, Some(LoxType::String(value)));
     }
 
     fn matches(&mut self, expected: char) -> bool {
@@ -228,10 +224,10 @@ impl<'a> Scanner<'a> {
     }
 
     fn add_token(&mut self, token_type: TokenType) {
-        self.add_token_with_literal(token_type, Literal::None);
+        self.add_token_with_literal(token_type, None);
     }
 
-    fn add_token_with_literal(&mut self, token_type: TokenType, literal: Literal) {
+    fn add_token_with_literal(&mut self, token_type: TokenType, literal: Option<LoxType>) {
         let lexeme = self.source[self.start..self.current].to_string();
         let token = Token::new(token_type, lexeme, literal, self.line);
 
