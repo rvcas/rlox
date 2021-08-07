@@ -5,7 +5,9 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use crate::{parser::Parser, scanner::Scanner, token::Token, token_type::TokenType};
+use crate::{
+    interpreter::Interpreter, parser::Parser, scanner::Scanner, token::Token, token_type::TokenType,
+};
 
 static HAD_ERROR: AtomicBool = AtomicBool::new(false);
 
@@ -71,9 +73,20 @@ fn run(src: &str) {
 
     let mut parser = Parser::new(tokens.clone());
 
-    let ast = parser.parse();
+    if had_error() {
+        return;
+    }
 
-    println!("{:?}", ast.unwrap());
+    let ast = parser.parse().unwrap();
+
+    let interpreter = Interpreter::new();
+
+    let res_value = interpreter.evaluate(&ast);
+
+    match res_value {
+        Ok(value) => println!("{}", value),
+        Err(_) => println!("error"),
+    }
 }
 
 pub fn error(line: usize, message: &str) {

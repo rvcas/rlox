@@ -1,4 +1,5 @@
 mod ast;
+mod interpreter;
 pub mod lox;
 mod lox_type;
 mod parser;
