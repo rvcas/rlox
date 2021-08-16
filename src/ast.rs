@@ -1,6 +1,12 @@
 use crate::{lox_type::LoxType, token::Token};
 
 #[derive(Clone, Debug)]
+pub enum Stmt {
+    Expression(Expr),
+    Print(Expr),
+}
+
+#[derive(Clone, Debug)]
 pub enum Expr {
     Binary {
         left: Box<Expr>,

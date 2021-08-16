@@ -95,11 +95,11 @@ fn run(src: &str) {
         return;
     }
 
+    let statements = parse_result.unwrap();
+
     let interpreter = Interpreter::new();
 
-    let ast = parse_result.unwrap();
-
-    interpreter.interpret(&ast);
+    interpreter.interpret(&statements);
 }
 
 pub fn error(line: usize, message: &str) {

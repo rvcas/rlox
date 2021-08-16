@@ -1,4 +1,10 @@
-use crate::{ast::Expr, lox, lox_type::LoxType, token::Token, token_type::TokenType};
+use crate::{
+    ast::{Expr, Stmt},
+    lox,
+    lox_type::LoxType,
+    token::Token,
+    token_type::TokenType,
+};
 
 pub struct RuntimeError {
     pub token: Token,
@@ -21,10 +27,13 @@ impl Interpreter {
         Self {}
     }
 
-    pub fn interpret(&self, expr: &Expr) {
-        match self.evaluate(expr) {
-            Ok(value) => println!("{}", value),
-            Err(err) => lox::runtime_error(err),
+    pub fn interpret(&self, statements: &[Stmt]) {
+        for statement in statements {
+            if let Err(err) = self.execute(statement) {
+                lox::runtime_error(err);
+
+                break;
+            }
         }
     }
 
@@ -118,6 +127,21 @@ impl Interpreter {
                 }
             }
         }
+    }
+
+    fn execute(&self, stmt: &Stmt) -> Result<(), RuntimeError> {
+        match stmt {
+            Stmt::Expression(expr) => {
+                self.evaluate(expr)?;
+            }
+            Stmt::Print(expr) => {
+                let value = self.evaluate(expr)?;
+
+                println!("{}", value);
+            }
+        }
+
+        Ok(())
     }
 
     fn check_number_operand(token: Token, operand: LoxType) -> Result<f64, RuntimeError> {
