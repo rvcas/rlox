@@ -62,8 +62,20 @@ impl Interpreter {
         Ok(())
     }
 
-    fn evaluate(&self, expr: &Expr) -> Result<LoxType, RuntimeError> {
+    fn evaluate(&mut self, expr: &Expr) -> Result<LoxType, RuntimeError> {
         match expr {
+            Expr::Assign { name, value } => {
+                let value = self.evaluate(value)?;
+
+                if self.env.assign(&name.lexeme, value.clone()) {
+                    Ok(value)
+                } else {
+                    Err(RuntimeError::new(
+                        name.clone(),
+                        &format!("Undefined variable '{}'.", name.lexeme),
+                    ))
+                }
+            }
             Expr::Binary {
                 left,
                 operator,
