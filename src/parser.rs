@@ -1,6 +1,7 @@
 use crate::{ast::Expr, lox, lox_type::LoxType, token::Token, token_type::TokenType};
 
-struct ParseError;
+#[derive(Debug)]
+pub struct ParseError;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -12,11 +13,8 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Option<Expr> {
-        match self.expression() {
-            Ok(expr) => Some(expr),
-            Err(_) => None,
-        }
+    pub fn parse(&mut self) -> Result<Expr, ParseError> {
+        self.expression()
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {

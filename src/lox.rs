@@ -6,10 +6,15 @@ use std::{
 };
 
 use crate::{
-    interpreter::Interpreter, parser::Parser, scanner::Scanner, token::Token, token_type::TokenType,
+    interpreter::{Interpreter, RuntimeError},
+    parser::Parser,
+    scanner::Scanner,
+    token::Token,
+    token_type::TokenType,
 };
 
 static HAD_ERROR: AtomicBool = AtomicBool::new(false);
+static HAD_RUNTIME_ERROR: AtomicBool = AtomicBool::new(false);
 
 pub fn run_file(path_name: &str) {
     let file_path = Path::new(path_name);
@@ -23,7 +28,17 @@ pub fn run_file(path_name: &str) {
             let read_res = src_file.read_to_string(&mut src);
 
             match read_res {
-                Ok(_) => run(&src),
+                Ok(_) => {
+                    run(&src);
+
+                    if had_error() {
+                        std::process::exit(65);
+                    }
+
+                    if had_runtime_error() {
+                        std::process::exit(70);
+                    }
+                }
                 Err(_) => println!("error: could not read {}", path_name),
             }
         }
@@ -52,6 +67,7 @@ pub fn run_prompt() {
                 run(&input);
 
                 set_had_error(false);
+                set_had_runtime_error(false);
             }
             Err(_) => {
                 println!("error: bad input");
@@ -63,30 +79,27 @@ pub fn run_prompt() {
 }
 
 fn run(src: &str) {
-    if had_error() {
-        std::process::exit(65);
-    }
-
     let mut scanner = Scanner::new(src);
 
     let tokens = scanner.scan_tokens();
-
-    let mut parser = Parser::new(tokens.clone());
 
     if had_error() {
         return;
     }
 
-    let ast = parser.parse().unwrap();
+    let mut parser = Parser::new(tokens.clone());
+
+    let parse_result = parser.parse();
+
+    if had_error() {
+        return;
+    }
 
     let interpreter = Interpreter::new();
 
-    let res_value = interpreter.evaluate(&ast);
+    let ast = parse_result.unwrap();
 
-    match res_value {
-        Ok(value) => println!("{}", value),
-        Err(_) => println!("error"),
-    }
+    interpreter.interpret(&ast);
 }
 
 pub fn error(line: usize, message: &str) {
@@ -107,10 +120,24 @@ pub fn parse_error(token: Token, message: &str) {
     }
 }
 
+pub fn runtime_error(err: RuntimeError) {
+    println!("{}\n[line {}]", err.message, err.token.line);
+
+    set_had_runtime_error(true);
+}
+
 fn had_error() -> bool {
     HAD_ERROR.load(Ordering::Relaxed)
 }
 
 fn set_had_error(b: bool) {
     HAD_ERROR.store(b, Ordering::Relaxed);
+}
+
+fn had_runtime_error() -> bool {
+    HAD_RUNTIME_ERROR.load(Ordering::Relaxed)
+}
+
+fn set_had_runtime_error(b: bool) {
+    HAD_RUNTIME_ERROR.store(b, Ordering::Relaxed);
 }

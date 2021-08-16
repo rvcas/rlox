@@ -1,8 +1,18 @@
-use std::convert::TryFrom;
+use crate::{ast::Expr, lox, lox_type::LoxType, token::Token, token_type::TokenType};
 
-use crate::{ast::Expr, lox_type::LoxType, token_type::TokenType};
+pub struct RuntimeError {
+    pub token: Token,
+    pub message: String,
+}
 
-pub struct InterpreterError;
+impl RuntimeError {
+    pub fn new(token: Token, message: &str) -> Self {
+        Self {
+            token,
+            message: message.to_string(),
+        }
+    }
+}
 
 pub struct Interpreter;
 
@@ -11,7 +21,14 @@ impl Interpreter {
         Self {}
     }
 
-    pub fn evaluate(&self, expr: &Expr) -> Result<LoxType, InterpreterError> {
+    pub fn interpret(&self, expr: &Expr) {
+        match self.evaluate(expr) {
+            Ok(value) => println!("{}", value),
+            Err(err) => lox::runtime_error(err),
+        }
+    }
+
+    fn evaluate(&self, expr: &Expr) -> Result<LoxType, RuntimeError> {
         match expr {
             Expr::Binary {
                 left,
@@ -23,46 +40,59 @@ impl Interpreter {
 
                 match operator.token_type {
                     TokenType::Minus => {
-                        let n = f64::try_from(left_value)?;
-                        let m = f64::try_from(right_value)?;
+                        let (n, m) =
+                            Self::check_number_operands(operator.clone(), left_value, right_value)?;
 
-                        let result = n - m;
-
-                        Ok(LoxType::Number(result))
+                        Ok(LoxType::Number(n - m))
                     }
                     TokenType::Plus => match (left_value, right_value) {
-                        (LoxType::Number(n), LoxType::Number(m)) => {
-                            let result = n + m;
-
-                            Ok(LoxType::Number(result))
-                        }
+                        (LoxType::Number(n), LoxType::Number(m)) => Ok(LoxType::Number(n + m)),
                         (LoxType::String(mut n), LoxType::String(m)) => {
                             n.push_str(&m);
 
                             Ok(LoxType::String(n))
                         }
-                        _ => Err(InterpreterError),
+                        _ => Err(RuntimeError::new(
+                            operator.clone(),
+                            "Operands must be two numbers or two strings.",
+                        )),
                     },
                     TokenType::Slash => {
-                        let n = f64::try_from(left_value)?;
-                        let m = f64::try_from(right_value)?;
+                        let (n, m) =
+                            Self::check_number_operands(operator.clone(), left_value, right_value)?;
 
-                        let result = n / m;
-
-                        Ok(LoxType::Number(result))
+                        Ok(LoxType::Number(n / m))
                     }
                     TokenType::Star => {
-                        let n = f64::try_from(left_value)?;
-                        let m = f64::try_from(right_value)?;
+                        let (n, m) =
+                            Self::check_number_operands(operator.clone(), left_value, right_value)?;
 
-                        let result = n * m;
-
-                        Ok(LoxType::Number(result))
+                        Ok(LoxType::Number(n * m))
                     }
-                    TokenType::Greater => Ok(LoxType::Boolean(left_value > right_value)),
-                    TokenType::GreaterEqual => Ok(LoxType::Boolean(left_value >= right_value)),
-                    TokenType::Less => Ok(LoxType::Boolean(left_value < right_value)),
-                    TokenType::LessEqual => Ok(LoxType::Boolean(left_value <= right_value)),
+                    TokenType::Greater => {
+                        let (n, m) =
+                            Self::check_number_operands(operator.clone(), left_value, right_value)?;
+
+                        Ok(LoxType::Boolean(n > m))
+                    }
+                    TokenType::GreaterEqual => {
+                        let (n, m) =
+                            Self::check_number_operands(operator.clone(), left_value, right_value)?;
+
+                        Ok(LoxType::Boolean(n >= m))
+                    }
+                    TokenType::Less => {
+                        let (n, m) =
+                            Self::check_number_operands(operator.clone(), left_value, right_value)?;
+
+                        Ok(LoxType::Boolean(n < m))
+                    }
+                    TokenType::LessEqual => {
+                        let (n, m) =
+                            Self::check_number_operands(operator.clone(), left_value, right_value)?;
+
+                        Ok(LoxType::Boolean(n <= m))
+                    }
                     TokenType::BangEqual => Ok(LoxType::Boolean(left_value != right_value)),
                     TokenType::EqualEqual => Ok(LoxType::Boolean(left_value == right_value)),
                     _ => unreachable!(),
@@ -80,13 +110,33 @@ impl Interpreter {
                         Ok(LoxType::Boolean(!b))
                     }
                     TokenType::Minus => {
-                        let n = f64::try_from(right_value)?;
+                        let n = Self::check_number_operand(operator.clone(), right_value)?;
 
                         Ok(LoxType::Number(-n))
                     }
                     _ => unreachable!(),
                 }
             }
+        }
+    }
+
+    fn check_number_operand(token: Token, operand: LoxType) -> Result<f64, RuntimeError> {
+        if let LoxType::Number(n) = operand {
+            Ok(n)
+        } else {
+            Err(RuntimeError::new(token, "Operand must be a number."))
+        }
+    }
+
+    fn check_number_operands(
+        token: Token,
+        left: LoxType,
+        right: LoxType,
+    ) -> Result<(f64, f64), RuntimeError> {
+        if let (LoxType::Number(n), LoxType::Number(m)) = (left, right) {
+            Ok((n, m))
+        } else {
+            Err(RuntimeError::new(token, "Operands must be numbers."))
         }
     }
 }
