@@ -19,18 +19,42 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, ParseError> {
+    pub fn parse(&mut self) -> Vec<Stmt> {
         let mut statements = Vec::new();
 
         while !self.is_at_end() {
-            statements.push(self.statement()?);
+            match self.declaration() {
+                Ok(stmt) => statements.push(stmt),
+                Err(_) => self.synchronize(),
+            }
         }
 
-        Ok(statements)
+        statements
     }
 
-    fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.equality()
+    fn declaration(&mut self) -> Result<Stmt, ParseError> {
+        if self.matches(vec![TokenType::Var]) {
+            self.var_declaration()
+        } else {
+            self.statement()
+        }
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let name = self.consume(TokenType::Identifier, "Expect variable name.")?;
+
+        let initializer = if self.matches(vec![TokenType::Equal]) {
+            self.expression()?
+        } else {
+            Expr::Literal(LoxType::Nil)
+        };
+
+        self.consume(
+            TokenType::SemiColon,
+            "Expect ';' after variable declaration.",
+        )?;
+
+        Ok(Stmt::Var { name, initializer })
     }
 
     fn statement(&mut self) -> Result<Stmt, ParseError> {
@@ -55,6 +79,10 @@ impl Parser {
         self.consume(TokenType::SemiColon, "Expect ';' after expression.")?;
 
         Ok(Stmt::Expression(expr))
+    }
+
+    fn expression(&mut self) -> Result<Expr, ParseError> {
+        self.equality()
     }
 
     fn equality(&mut self) -> Result<Expr, ParseError> {
@@ -160,6 +188,8 @@ impl Parser {
             && self.previous().literal.is_some()
         {
             Ok(Expr::Literal(self.previous().literal.unwrap()))
+        } else if self.matches(vec![TokenType::Identifier]) {
+            Ok(Expr::Variable(self.previous()))
         } else if self.matches(vec![TokenType::LeftParen]) {
             let expr = self.expression()?;
 
@@ -225,7 +255,6 @@ impl Parser {
         ParseError {}
     }
 
-    #[allow(dead_code)]
     fn synchronize(&mut self) {
         self.advance();
 

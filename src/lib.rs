@@ -1,4 +1,5 @@
 mod ast;
+mod environment;
 mod interpreter;
 pub mod lox;
 mod lox_type;

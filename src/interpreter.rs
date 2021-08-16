@@ -1,5 +1,6 @@
 use crate::{
     ast::{Expr, Stmt},
+    environment::Environment,
     lox,
     lox_type::LoxType,
     token::Token,
@@ -20,14 +21,18 @@ impl RuntimeError {
     }
 }
 
-pub struct Interpreter;
+pub struct Interpreter {
+    env: Environment,
+}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            env: Environment::new(),
+        }
     }
 
-    pub fn interpret(&self, statements: &[Stmt]) {
+    pub fn interpret(&mut self, statements: &[Stmt]) {
         for statement in statements {
             if let Err(err) = self.execute(statement) {
                 lox::runtime_error(err);
@@ -35,6 +40,26 @@ impl Interpreter {
                 break;
             }
         }
+    }
+
+    fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+        match stmt {
+            Stmt::Expression(expr) => {
+                self.evaluate(expr)?;
+            }
+            Stmt::Print(expr) => {
+                let value = self.evaluate(expr)?;
+
+                println!("{}", value);
+            }
+            Stmt::Var { name, initializer } => {
+                let value = self.evaluate(initializer)?;
+
+                self.env.define(&name.lexeme, value);
+            }
+        }
+
+        Ok(())
     }
 
     fn evaluate(&self, expr: &Expr) -> Result<LoxType, RuntimeError> {
@@ -126,22 +151,14 @@ impl Interpreter {
                     _ => unreachable!(),
                 }
             }
+            Expr::Variable(name) => match self.env.get(&name.lexeme) {
+                Some(value) => Ok(value),
+                None => Err(RuntimeError::new(
+                    name.clone(),
+                    &format!("Undefined variable '{}'.", name.lexeme),
+                )),
+            },
         }
-    }
-
-    fn execute(&self, stmt: &Stmt) -> Result<(), RuntimeError> {
-        match stmt {
-            Stmt::Expression(expr) => {
-                self.evaluate(expr)?;
-            }
-            Stmt::Print(expr) => {
-                let value = self.evaluate(expr)?;
-
-                println!("{}", value);
-            }
-        }
-
-        Ok(())
     }
 
     fn check_number_operand(token: Token, operand: LoxType) -> Result<f64, RuntimeError> {

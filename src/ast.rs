@@ -4,6 +4,7 @@ use crate::{lox_type::LoxType, token::Token};
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
+    Var { name: Token, initializer: Expr },
 }
 
 #[derive(Clone, Debug)]
@@ -21,4 +22,6 @@ pub enum Expr {
         operator: Token,
         right: Box<Expr>,
     },
+
+    Variable(Token),
 }

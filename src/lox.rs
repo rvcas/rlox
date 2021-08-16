@@ -89,15 +89,13 @@ fn run(src: &str) {
 
     let mut parser = Parser::new(tokens.clone());
 
-    let parse_result = parser.parse();
+    let statements = parser.parse();
 
     if had_error() {
         return;
     }
 
-    let statements = parse_result.unwrap();
-
-    let interpreter = Interpreter::new();
+    let mut interpreter = Interpreter::new();
 
     interpreter.interpret(&statements);
 }
