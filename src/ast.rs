@@ -2,6 +2,7 @@ use crate::{lox_type::LoxType, token::Token};
 
 #[derive(Clone, Debug)]
 pub enum Stmt {
+    Block(Vec<Stmt>),
     Expression(Expr),
     Print(Expr),
     Var { name: Token, initializer: Expr },

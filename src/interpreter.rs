@@ -44,6 +44,24 @@ impl Interpreter {
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
+            Stmt::Block(stmts) => {
+                let previous = self.env.clone();
+
+                self.env = Environment::with_enclosing(Box::new(self.env.clone()));
+
+                for stmt in stmts {
+                    match self.execute(stmt) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            self.env = previous;
+
+                            return Err(err);
+                        }
+                    };
+                }
+
+                self.env = previous;
+            }
             Stmt::Expression(expr) => {
                 self.evaluate(expr)?;
             }
