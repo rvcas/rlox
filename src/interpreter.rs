@@ -46,24 +46,29 @@ impl Interpreter {
         match stmt {
             Stmt::Block(stmts) => {
                 let previous = self.env.clone();
+                self.env = Environment::with_enclosing(Box::new(previous));
 
-                self.env = Environment::with_enclosing(Box::new(self.env.clone()));
-
-                for stmt in stmts {
-                    match self.execute(stmt) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            self.env = previous;
-
-                            return Err(err);
-                        }
-                    };
+                for statement in stmts {
+                    self.execute(statement)?;
                 }
 
-                self.env = previous;
+                if let Some(enclosing) = &self.env.enclosing {
+                    self.env = *enclosing.clone();
+                }
             }
             Stmt::Expression(expr) => {
                 self.evaluate(expr)?;
+            }
+            Stmt::If {
+                condition,
+                then_branch,
+                opt_else_branch,
+            } => {
+                if bool::from(self.evaluate(condition)?) {
+                    self.execute(then_branch)?;
+                } else if let Some(else_branch) = opt_else_branch {
+                    self.execute(else_branch)?
+                }
             }
             Stmt::Print(expr) => {
                 let value = self.evaluate(expr)?;
@@ -74,6 +79,11 @@ impl Interpreter {
                 let value = self.evaluate(initializer)?;
 
                 self.env.define(&name.lexeme, value);
+            }
+            Stmt::While { condition, body } => {
+                while bool::from(self.evaluate(condition)?) {
+                    self.execute(body)?;
+                }
             }
         }
 
@@ -163,6 +173,27 @@ impl Interpreter {
                 }
             }
             Expr::Literal(value) => Ok(value.clone()),
+            Expr::Logical {
+                left,
+                operator,
+                right,
+            } => {
+                let left_value = self.evaluate(left)?;
+
+                let is_left_truthy = bool::from(left_value.clone());
+
+                if operator.token_type == TokenType::Or {
+                    if is_left_truthy {
+                        return Ok(left_value);
+                    }
+                } else {
+                    if !is_left_truthy {
+                        return Ok(left_value);
+                    }
+                }
+
+                self.evaluate(right)
+            }
             Expr::Grouping(grouped_expr) => self.evaluate(grouped_expr),
             Expr::Unary { operator, right } => {
                 let right_value = self.evaluate(right)?;
