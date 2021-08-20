@@ -1,6 +1,9 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::{
     ast::{Expr, Stmt},
     environment::Environment,
+    function::Function,
     lox,
     lox_type::LoxType,
     token::Token,
@@ -8,12 +11,12 @@ use crate::{
 };
 
 pub struct RuntimeError {
-    pub token: Token,
+    pub token: Option<Token>,
     pub message: String,
 }
 
 impl RuntimeError {
-    pub fn new(token: Token, message: &str) -> Self {
+    pub fn new(token: Option<Token>, message: &str) -> Self {
         Self {
             token,
             message: message.to_string(),
@@ -22,13 +25,30 @@ impl RuntimeError {
 }
 
 pub struct Interpreter {
+    pub globals: Environment,
     env: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let mut env = Environment::new();
+
+        env.define(
+            "clock",
+            LoxType::Callable(Function::Native {
+                arity: 0,
+                body: |_| {
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|duration| LoxType::Number(duration.as_millis() as f64))
+                        .map_err(|_| RuntimeError::new(None, "could not retrieve time."))
+                },
+            }),
+        );
+
         Self {
-            env: Environment::new(),
+            globals: env.clone(),
+            env,
         }
     }
 
@@ -45,19 +65,22 @@ impl Interpreter {
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
             Stmt::Block(stmts) => {
-                let previous = self.env.clone();
-                self.env = Environment::with_enclosing(Box::new(previous));
-
-                for statement in stmts {
-                    self.execute(statement)?;
-                }
-
-                if let Some(enclosing) = &self.env.enclosing {
-                    self.env = *enclosing.clone();
-                }
+                self.execute_block(
+                    stmts,
+                    Environment::with_enclosing(Box::new(self.env.clone())),
+                )?;
             }
             Stmt::Expression(expr) => {
                 self.evaluate(expr)?;
+            }
+            Stmt::Function { name, body, params } => {
+                let function = LoxType::Callable(Function::User {
+                    name: Box::new(name.clone()),
+                    body: body.to_vec(),
+                    params: params.to_vec(),
+                });
+
+                self.env.define(&name.lexeme, function);
             }
             Stmt::If {
                 condition,
@@ -90,6 +113,20 @@ impl Interpreter {
         Ok(())
     }
 
+    pub fn execute_block(&mut self, stmts: &[Stmt], env: Environment) -> Result<(), RuntimeError> {
+        self.env = env;
+
+        for statement in stmts {
+            self.execute(statement)?;
+        }
+
+        if let Some(enclosing) = &self.env.enclosing {
+            self.env = *enclosing.clone();
+        }
+
+        Ok(())
+    }
+
     fn evaluate(&mut self, expr: &Expr) -> Result<LoxType, RuntimeError> {
         match expr {
             Expr::Assign { name, value } => {
@@ -99,7 +136,7 @@ impl Interpreter {
                     Ok(value)
                 } else {
                     Err(RuntimeError::new(
-                        name.clone(),
+                        Some(name.clone()),
                         &format!("Undefined variable '{}'.", name.lexeme),
                     ))
                 }
@@ -127,7 +164,7 @@ impl Interpreter {
                             Ok(LoxType::String(n))
                         }
                         _ => Err(RuntimeError::new(
-                            operator.clone(),
+                            Some(operator.clone()),
                             "Operands must be two numbers or two strings.",
                         )),
                     },
@@ -172,6 +209,41 @@ impl Interpreter {
                     _ => unreachable!(),
                 }
             }
+            Expr::Call {
+                callee,
+                paren,
+                arguments,
+            } => {
+                let callee_value = self.evaluate(callee)?;
+
+                let mut arguments_values = Vec::new();
+
+                for argument in arguments {
+                    arguments_values.push(self.evaluate(argument)?);
+                }
+
+                match callee_value {
+                    LoxType::Callable(function) => {
+                        if arguments_values.len() != function.arity() {
+                            Err(RuntimeError::new(
+                                Some(paren.clone()),
+                                &format!(
+                                    "Expected {} arguments but got {}.",
+                                    function.arity(),
+                                    arguments_values.len()
+                                ),
+                            ))
+                        } else {
+                            function.call(self, &arguments_values)
+                        }
+                    }
+                    _ => Err(RuntimeError::new(
+                        Some(paren.clone()),
+                        "Can only call functions and classes.",
+                    )),
+                }
+            }
+            Expr::Grouping(grouped_expr) => self.evaluate(grouped_expr),
             Expr::Literal(value) => Ok(value.clone()),
             Expr::Logical {
                 left,
@@ -194,7 +266,6 @@ impl Interpreter {
 
                 self.evaluate(right)
             }
-            Expr::Grouping(grouped_expr) => self.evaluate(grouped_expr),
             Expr::Unary { operator, right } => {
                 let right_value = self.evaluate(right)?;
 
@@ -215,7 +286,7 @@ impl Interpreter {
             Expr::Variable(name) => match self.env.get(&name.lexeme) {
                 Some(value) => Ok(value),
                 None => Err(RuntimeError::new(
-                    name.clone(),
+                    Some(name.clone()),
                     &format!("Undefined variable '{}'.", name.lexeme),
                 )),
             },
@@ -226,7 +297,7 @@ impl Interpreter {
         if let LoxType::Number(n) = operand {
             Ok(n)
         } else {
-            Err(RuntimeError::new(token, "Operand must be a number."))
+            Err(RuntimeError::new(Some(token), "Operand must be a number."))
         }
     }
 
@@ -238,7 +309,7 @@ impl Interpreter {
         if let (LoxType::Number(n), LoxType::Number(m)) = (left, right) {
             Ok((n, m))
         } else {
-            Err(RuntimeError::new(token, "Operands must be numbers."))
+            Err(RuntimeError::new(Some(token), "Operands must be numbers."))
         }
     }
 }

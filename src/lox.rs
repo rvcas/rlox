@@ -119,7 +119,11 @@ pub fn parse_error(token: Token, message: &str) {
 }
 
 pub fn runtime_error(err: RuntimeError) {
-    println!("{}\n[line {}]", err.message, err.token.line);
+    if let Some(token) = err.token {
+        println!("{}\n[line {}]", err.message, token.line);
+    } else {
+        println!("{}", err.message);
+    }
 
     set_had_runtime_error(true);
 }

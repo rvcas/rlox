@@ -4,6 +4,11 @@ use crate::{lox_type::LoxType, token::Token};
 pub enum Stmt {
     Block(Vec<Stmt>),
     Expression(Expr),
+    Function {
+        name: Token,
+        params: Vec<Token>,
+        body: Vec<Stmt>,
+    },
     If {
         condition: Expr,
         then_branch: Box<Stmt>,
@@ -26,11 +31,19 @@ pub enum Expr {
         name: Token,
         value: Box<Expr>,
     },
+
     Binary {
         left: Box<Expr>,
         operator: Token,
         right: Box<Expr>,
     },
+
+    Call {
+        callee: Box<Expr>,
+        paren: Token,
+        arguments: Vec<Expr>,
+    },
+
     Grouping(Box<Expr>),
 
     Literal(LoxType),
