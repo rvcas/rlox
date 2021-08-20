@@ -29,7 +29,9 @@ pub fn run_file(path_name: &str) {
 
             match read_res {
                 Ok(_) => {
-                    run(&src);
+                    let mut interpreter = Interpreter::new();
+
+                    run(&src, &mut interpreter);
 
                     if had_error() {
                         std::process::exit(65);
@@ -49,6 +51,8 @@ pub fn run_file(path_name: &str) {
 pub fn run_prompt() {
     let mut input = String::new();
 
+    let mut interpreter = Interpreter::new();
+
     loop {
         print!("> ");
 
@@ -64,7 +68,7 @@ pub fn run_prompt() {
                     input.pop();
                 }
 
-                run(&input);
+                run(&input, &mut interpreter);
 
                 set_had_error(false);
                 set_had_runtime_error(false);
@@ -78,7 +82,7 @@ pub fn run_prompt() {
     }
 }
 
-fn run(src: &str) {
+fn run(src: &str, interpreter: &mut Interpreter) {
     let mut scanner = Scanner::new(src);
 
     let tokens = scanner.scan_tokens();
@@ -94,8 +98,6 @@ fn run(src: &str) {
     if had_error() {
         return;
     }
-
-    let mut interpreter = Interpreter::new();
 
     interpreter.interpret(&statements);
 }
