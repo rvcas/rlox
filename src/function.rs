@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{cell::RefCell, fmt, rc::Rc};
 
 use crate::{
     ast::Stmt,
@@ -18,6 +18,7 @@ pub enum Function {
         name: Box<Token>,
         params: Vec<Token>,
         body: Vec<Stmt>,
+        closure: Rc<RefCell<Environment>>,
     },
 }
 
@@ -40,11 +41,16 @@ impl Function {
 
         match self {
             Native { body, .. } => body(arguments),
-            User { body, params, .. } => {
-                let mut env = Environment::with_enclosing(Box::new(interpreter.env.clone()));
+            User {
+                body,
+                params,
+                closure,
+                ..
+            } => {
+                let env = Rc::new(RefCell::new(Environment::with_enclosing(closure)));
 
                 for (param, arg) in params.iter().zip(arguments) {
-                    env.define(&param.lexeme, arg.clone());
+                    env.borrow_mut().define(&param.lexeme, arg.clone());
                 }
 
                 match interpreter.execute_block(body, env) {

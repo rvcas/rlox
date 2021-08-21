@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::lox_type::LoxType;
 
 #[derive(Clone, Debug)]
 pub struct Environment {
     values: HashMap<String, LoxType>,
-    pub enclosing: Option<Box<Environment>>,
+    pub enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
@@ -16,10 +16,10 @@ impl Environment {
         }
     }
 
-    pub fn with_enclosing(enclosing: Box<Self>) -> Self {
+    pub fn with_enclosing(enclosing: &Rc<RefCell<Environment>>) -> Self {
         Self {
             values: HashMap::new(),
-            enclosing: Some(enclosing),
+            enclosing: Some(Rc::clone(enclosing)),
         }
     }
 
@@ -30,7 +30,7 @@ impl Environment {
             res.cloned()
         } else {
             if let Some(enclosing) = &self.enclosing {
-                enclosing.get(name)
+                enclosing.borrow().get(name)
             } else {
                 None
             }
@@ -44,7 +44,7 @@ impl Environment {
             true
         } else {
             if let Some(enclosing) = &mut self.enclosing {
-                enclosing.assign(name, value)
+                enclosing.borrow_mut().assign(name, value)
             } else {
                 false
             }

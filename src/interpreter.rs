@@ -1,4 +1,8 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use crate::{
     ast::{Expr, Stmt},
@@ -36,14 +40,15 @@ impl RuntimeError {
 }
 
 pub struct Interpreter {
-    pub env: Environment,
+    globals: Rc<RefCell<Environment>>,
+    env: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        let mut env = Environment::new();
+        let env = Rc::new(RefCell::new(Environment::new()));
 
-        env.define(
+        env.borrow_mut().define(
             "clock",
             LoxType::Callable(Function::Native {
                 arity: 0,
@@ -58,7 +63,10 @@ impl Interpreter {
             }),
         );
 
-        Self { env }
+        Self {
+            globals: Rc::clone(&env),
+            env: Rc::clone(&env),
+        }
     }
 
     pub fn interpret(&mut self, statements: &[Stmt]) {
@@ -76,7 +84,7 @@ impl Interpreter {
             Stmt::Block(stmts) => {
                 self.execute_block(
                     stmts,
-                    Environment::with_enclosing(Box::new(self.env.clone())),
+                    Rc::new(RefCell::new(Environment::with_enclosing(&self.env))),
                 )?;
             }
             Stmt::Expression(expr) => {
@@ -87,9 +95,10 @@ impl Interpreter {
                     name: Box::new(name.clone()),
                     body: body.to_vec(),
                     params: params.to_vec(),
+                    closure: Rc::clone(&self.env),
                 });
 
-                self.env.define(&name.lexeme, function);
+                self.env.borrow_mut().define(&name.lexeme, function);
             }
             Stmt::If {
                 condition,
@@ -118,7 +127,7 @@ impl Interpreter {
             Stmt::Var { name, initializer } => {
                 let value = self.evaluate(initializer)?;
 
-                self.env.define(&name.lexeme, value);
+                self.env.borrow_mut().define(&name.lexeme, value);
             }
             Stmt::While { condition, body } => {
                 while bool::from(self.evaluate(condition)?) {
@@ -133,25 +142,25 @@ impl Interpreter {
     pub fn execute_block(
         &mut self,
         stmts: &[Stmt],
-        env: Environment,
+        env: Rc<RefCell<Environment>>,
     ) -> Result<(), InterpreterError> {
+        let previous = self.env.clone();
+
         self.env = env;
 
-        for statement in stmts {
-            self.execute(statement).map_err(|err| {
-                if let Some(enclosing) = &self.env.enclosing {
-                    self.env = *enclosing.clone();
-                }
+        let mut exec_stmts = || -> Result<(), InterpreterError> {
+            for stmt in stmts {
+                self.execute(stmt)?
+            }
 
-                err
-            })?;
-        }
+            Ok(())
+        };
 
-        if let Some(enclosing) = &self.env.enclosing {
-            self.env = *enclosing.clone();
-        }
+        let res = exec_stmts();
 
-        Ok(())
+        self.env = previous;
+
+        res
     }
 
     fn evaluate(&mut self, expr: &Expr) -> Result<LoxType, InterpreterError> {
@@ -159,7 +168,7 @@ impl Interpreter {
             Expr::Assign { name, value } => {
                 let value = self.evaluate(value)?;
 
-                if self.env.assign(&name.lexeme, value.clone()) {
+                if self.env.borrow_mut().assign(&name.lexeme, value.clone()) {
                     Ok(value)
                 } else {
                     Err(InterpreterError::runtime_error(
@@ -310,7 +319,7 @@ impl Interpreter {
                     _ => unreachable!(),
                 }
             }
-            Expr::Variable(name) => match self.env.get(&name.lexeme) {
+            Expr::Variable(name) => match self.env.borrow().get(&name.lexeme) {
                 Some(value) => Ok(value),
                 None => Err(InterpreterError::runtime_error(
                     Some(name.clone()),
