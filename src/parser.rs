@@ -102,6 +102,8 @@ impl Parser {
             self.if_statement()
         } else if self.matches(vec![TokenType::Print]) {
             self.print_statement()
+        } else if self.matches(vec![TokenType::Return]) {
+            self.return_statement()
         } else if self.matches(vec![TokenType::While]) {
             self.while_statement()
         } else if self.matches(vec![TokenType::LeftBrace]) {
@@ -184,6 +186,20 @@ impl Parser {
         self.consume(TokenType::SemiColon, "Expect ';' after value.")?;
 
         Ok(Stmt::Print(value))
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt, ParseError> {
+        let keyword = self.previous();
+
+        let value = if !self.check(TokenType::SemiColon) {
+            self.expression()?
+        } else {
+            Expr::Literal(LoxType::Nil)
+        };
+
+        self.consume(TokenType::SemiColon, "Expect ';' after return value.")?;
+
+        Ok(Stmt::Return { keyword, value })
     }
 
     fn while_statement(&mut self) -> Result<Stmt, ParseError> {

@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    interpreter::{Interpreter, RuntimeError},
+    interpreter::{Interpreter, InterpreterError},
     parser::Parser,
     scanner::Scanner,
     token::Token,
@@ -120,14 +120,16 @@ pub fn parse_error(token: Token, message: &str) {
     }
 }
 
-pub fn runtime_error(err: RuntimeError) {
-    if let Some(token) = err.token {
-        println!("{}\n[line {}]", err.message, token.line);
-    } else {
-        println!("{}", err.message);
-    }
+pub fn runtime_error(err: InterpreterError) {
+    if let InterpreterError::RuntimeError(err) = err {
+        if let Some(token) = err.token {
+            println!("{}\n[line {}]", err.message, token.line);
+        } else {
+            println!("{}", err.message);
+        }
 
-    set_had_runtime_error(true);
+        set_had_runtime_error(true);
+    }
 }
 
 fn had_error() -> bool {

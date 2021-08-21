@@ -3,7 +3,7 @@ use std::fmt;
 use crate::{
     ast::Stmt,
     environment::Environment,
-    interpreter::{Interpreter, RuntimeError},
+    interpreter::{Interpreter, InterpreterError},
     lox_type::LoxType,
     token::Token,
 };
@@ -12,7 +12,7 @@ use crate::{
 pub enum Function {
     Native {
         arity: usize,
-        body: fn(&[LoxType]) -> Result<LoxType, RuntimeError>,
+        body: fn(&[LoxType]) -> Result<LoxType, InterpreterError>,
     },
     User {
         name: Box<Token>,
@@ -35,21 +35,23 @@ impl Function {
         &self,
         interpreter: &mut Interpreter,
         arguments: &[LoxType],
-    ) -> Result<LoxType, RuntimeError> {
+    ) -> Result<LoxType, InterpreterError> {
         use Function::*;
 
         match self {
             Native { body, .. } => body(arguments),
             User { body, params, .. } => {
-                let mut env = Environment::with_enclosing(Box::new(interpreter.globals.clone()));
+                let mut env = Environment::with_enclosing(Box::new(interpreter.env.clone()));
 
                 for (param, arg) in params.iter().zip(arguments) {
                     env.define(&param.lexeme, arg.clone());
                 }
 
-                interpreter.execute_block(body, env)?;
-
-                Ok(LoxType::Nil)
+                match interpreter.execute_block(body, env) {
+                    Ok(()) => Ok(LoxType::Nil),
+                    Err(InterpreterError::Return(value)) => Ok(value),
+                    Err(err) => Err(err),
+                }
             }
         }
     }

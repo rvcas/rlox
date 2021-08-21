@@ -10,6 +10,17 @@ use crate::{
     token_type::TokenType,
 };
 
+pub enum InterpreterError {
+    RuntimeError(RuntimeError),
+    Return(LoxType),
+}
+
+impl InterpreterError {
+    pub fn runtime_error(token: Option<Token>, message: &str) -> Self {
+        Self::RuntimeError(RuntimeError::new(token, message))
+    }
+}
+
 pub struct RuntimeError {
     pub token: Option<Token>,
     pub message: String,
@@ -25,8 +36,7 @@ impl RuntimeError {
 }
 
 pub struct Interpreter {
-    pub globals: Environment,
-    env: Environment,
+    pub env: Environment,
 }
 
 impl Interpreter {
@@ -41,15 +51,14 @@ impl Interpreter {
                     SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .map(|duration| LoxType::Number(duration.as_millis() as f64))
-                        .map_err(|_| RuntimeError::new(None, "could not retrieve time."))
+                        .map_err(|_| {
+                            InterpreterError::runtime_error(None, "could not retrieve time.")
+                        })
                 },
             }),
         );
 
-        Self {
-            globals: env.clone(),
-            env,
-        }
+        Self { env }
     }
 
     pub fn interpret(&mut self, statements: &[Stmt]) {
@@ -62,7 +71,7 @@ impl Interpreter {
         }
     }
 
-    fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    fn execute(&mut self, stmt: &Stmt) -> Result<(), InterpreterError> {
         match stmt {
             Stmt::Block(stmts) => {
                 self.execute_block(
@@ -98,6 +107,14 @@ impl Interpreter {
 
                 println!("{}", value);
             }
+            Stmt::Return { value, .. } => {
+                let value = match *value {
+                    Expr::Literal(LoxType::Nil) => LoxType::Nil,
+                    _ => self.evaluate(value)?,
+                };
+
+                return Err(InterpreterError::Return(value));
+            }
             Stmt::Var { name, initializer } => {
                 let value = self.evaluate(initializer)?;
 
@@ -113,11 +130,21 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn execute_block(&mut self, stmts: &[Stmt], env: Environment) -> Result<(), RuntimeError> {
+    pub fn execute_block(
+        &mut self,
+        stmts: &[Stmt],
+        env: Environment,
+    ) -> Result<(), InterpreterError> {
         self.env = env;
 
         for statement in stmts {
-            self.execute(statement)?;
+            self.execute(statement).map_err(|err| {
+                if let Some(enclosing) = &self.env.enclosing {
+                    self.env = *enclosing.clone();
+                }
+
+                err
+            })?;
         }
 
         if let Some(enclosing) = &self.env.enclosing {
@@ -127,7 +154,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn evaluate(&mut self, expr: &Expr) -> Result<LoxType, RuntimeError> {
+    fn evaluate(&mut self, expr: &Expr) -> Result<LoxType, InterpreterError> {
         match expr {
             Expr::Assign { name, value } => {
                 let value = self.evaluate(value)?;
@@ -135,7 +162,7 @@ impl Interpreter {
                 if self.env.assign(&name.lexeme, value.clone()) {
                     Ok(value)
                 } else {
-                    Err(RuntimeError::new(
+                    Err(InterpreterError::runtime_error(
                         Some(name.clone()),
                         &format!("Undefined variable '{}'.", name.lexeme),
                     ))
@@ -163,7 +190,7 @@ impl Interpreter {
 
                             Ok(LoxType::String(n))
                         }
-                        _ => Err(RuntimeError::new(
+                        _ => Err(InterpreterError::runtime_error(
                             Some(operator.clone()),
                             "Operands must be two numbers or two strings.",
                         )),
@@ -225,7 +252,7 @@ impl Interpreter {
                 match callee_value {
                     LoxType::Callable(function) => {
                         if arguments_values.len() != function.arity() {
-                            Err(RuntimeError::new(
+                            Err(InterpreterError::runtime_error(
                                 Some(paren.clone()),
                                 &format!(
                                     "Expected {} arguments but got {}.",
@@ -237,7 +264,7 @@ impl Interpreter {
                             function.call(self, &arguments_values)
                         }
                     }
-                    _ => Err(RuntimeError::new(
+                    _ => Err(InterpreterError::runtime_error(
                         Some(paren.clone()),
                         "Can only call functions and classes.",
                     )),
@@ -285,7 +312,7 @@ impl Interpreter {
             }
             Expr::Variable(name) => match self.env.get(&name.lexeme) {
                 Some(value) => Ok(value),
-                None => Err(RuntimeError::new(
+                None => Err(InterpreterError::runtime_error(
                     Some(name.clone()),
                     &format!("Undefined variable '{}'.", name.lexeme),
                 )),
@@ -293,11 +320,14 @@ impl Interpreter {
         }
     }
 
-    fn check_number_operand(token: Token, operand: LoxType) -> Result<f64, RuntimeError> {
+    fn check_number_operand(token: Token, operand: LoxType) -> Result<f64, InterpreterError> {
         if let LoxType::Number(n) = operand {
             Ok(n)
         } else {
-            Err(RuntimeError::new(Some(token), "Operand must be a number."))
+            Err(InterpreterError::runtime_error(
+                Some(token),
+                "Operand must be a number.",
+            ))
         }
     }
 
@@ -305,11 +335,14 @@ impl Interpreter {
         token: Token,
         left: LoxType,
         right: LoxType,
-    ) -> Result<(f64, f64), RuntimeError> {
+    ) -> Result<(f64, f64), InterpreterError> {
         if let (LoxType::Number(n), LoxType::Number(m)) = (left, right) {
             Ok((n, m))
         } else {
-            Err(RuntimeError::new(Some(token), "Operands must be numbers."))
+            Err(InterpreterError::runtime_error(
+                Some(token),
+                "Operands must be numbers.",
+            ))
         }
     }
 }
