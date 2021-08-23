@@ -29,11 +29,31 @@ impl Environment {
         if res.is_some() {
             res.cloned()
         } else {
-            if let Some(enclosing) = &self.enclosing {
+            if let Some(ref enclosing) = self.enclosing {
                 enclosing.borrow().get(name)
             } else {
                 None
             }
+        }
+    }
+
+    pub fn get_at(&self, distance: usize, name: &str) -> Option<LoxType> {
+        if distance > 0 {
+            Some(
+                self.ancestor(distance)
+                    .borrow()
+                    .values
+                    .get(name)
+                    .expect(&format!("Undefined variable '{}'", name))
+                    .clone(),
+            )
+        } else {
+            Some(
+                self.values
+                    .get(name)
+                    .expect(&format!("Undefined variable '{}'", name))
+                    .clone(),
+            )
         }
     }
 
@@ -43,7 +63,7 @@ impl Environment {
 
             true
         } else {
-            if let Some(enclosing) = &mut self.enclosing {
+            if let Some(ref enclosing) = self.enclosing {
                 enclosing.borrow_mut().assign(name, value)
             } else {
                 false
@@ -51,7 +71,41 @@ impl Environment {
         }
     }
 
+    pub fn assign_at(&mut self, distance: usize, name: &str, value: LoxType) -> bool {
+        if distance > 0 {
+            self.ancestor(distance)
+                .borrow_mut()
+                .values
+                .insert(name.to_string(), value);
+        } else {
+            self.values.insert(name.to_string(), value);
+        }
+
+        true
+    }
+
     pub fn define(&mut self, name: &str, value: LoxType) {
         self.values.insert(name.to_string(), value);
+    }
+
+    fn ancestor(&self, distance: usize) -> Rc<RefCell<Environment>> {
+        // Get first ancestor
+        let parent = self
+            .enclosing
+            .clone()
+            .expect(&format!("No enclosing environment at {}", 1));
+        let mut environment = Rc::clone(&parent);
+
+        // Get next ancestors
+        for i in 1..distance {
+            let parent = environment
+                .borrow()
+                .enclosing
+                .clone()
+                .expect(&format!("No enclosing environment at {}", i));
+            environment = Rc::clone(&parent);
+        }
+
+        environment
     }
 }

@@ -72,3 +72,14 @@ pub enum Expr {
 
     Variable(Token),
 }
+
+impl Expr {
+    pub fn is_nil(&self) -> bool {
+        use Expr::*;
+
+        match self {
+            Literal(LoxType::Nil) => true,
+            _ => false,
+        }
+    }
+}

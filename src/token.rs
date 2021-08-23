@@ -1,8 +1,11 @@
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    hash::{Hash, Hasher},
+};
 
 use crate::{lox_type::LoxType, token_type::TokenType};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
@@ -35,3 +38,12 @@ impl Display for Token {
         )
     }
 }
+
+impl Hash for Token {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.lexeme.hash(state);
+        self.line.hash(state);
+    }
+}
+
+impl Eq for Token {}

@@ -502,7 +502,7 @@ impl Parser {
     }
 
     fn error(&self, token: Token, message: &str) -> ParseError {
-        lox::parse_error(token, message);
+        lox::parse_error(&token, message);
 
         ParseError {}
     }

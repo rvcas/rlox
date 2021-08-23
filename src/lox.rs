@@ -8,6 +8,7 @@ use std::{
 use crate::{
     interpreter::{Interpreter, InterpreterError},
     parser::Parser,
+    resolver::Resolver,
     scanner::Scanner,
     token::Token,
     token_type::TokenType,
@@ -99,6 +100,14 @@ fn run(src: &str, interpreter: &mut Interpreter) {
         return;
     }
 
+    let mut resolver = Resolver::new(interpreter);
+
+    resolver.resolve(&statements);
+
+    if had_error() {
+        return;
+    }
+
     interpreter.interpret(&statements);
 }
 
@@ -112,7 +121,7 @@ fn report(line: usize, where_: &str, message: &str) {
     set_had_error(true);
 }
 
-pub fn parse_error(token: Token, message: &str) {
+pub fn parse_error(token: &Token, message: &str) {
     if token.token_type == TokenType::Eof {
         report(token.line, " at end", message)
     } else {

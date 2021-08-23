@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -42,6 +43,7 @@ impl RuntimeError {
 pub struct Interpreter {
     globals: Rc<RefCell<Environment>>,
     env: Rc<RefCell<Environment>>,
+    locals: HashMap<Token, usize>,
 }
 
 impl Interpreter {
@@ -66,6 +68,7 @@ impl Interpreter {
         Self {
             globals: Rc::clone(&env),
             env: Rc::clone(&env),
+            locals: HashMap::new(),
         }
     }
 
@@ -77,6 +80,10 @@ impl Interpreter {
                 break;
             }
         }
+    }
+
+    pub fn resolve(&mut self, name: &Token, depth: usize) {
+        self.locals.insert(name.clone(), depth);
     }
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), InterpreterError> {
@@ -146,9 +153,9 @@ impl Interpreter {
     ) -> Result<(), InterpreterError> {
         let previous = self.env.clone();
 
-        self.env = env;
+        let exec_stmts = || -> Result<(), InterpreterError> {
+            self.env = env;
 
-        let mut exec_stmts = || -> Result<(), InterpreterError> {
             for stmt in stmts {
                 self.execute(stmt)?
             }
@@ -168,7 +175,15 @@ impl Interpreter {
             Expr::Assign { name, value } => {
                 let value = self.evaluate(value)?;
 
-                if self.env.borrow_mut().assign(&name.lexeme, value.clone()) {
+                let success = if let Some(distance) = self.locals.get(name) {
+                    self.env
+                        .borrow_mut()
+                        .assign_at(*distance, &name.lexeme, value.clone())
+                } else {
+                    self.env.borrow_mut().assign(&name.lexeme, value.clone())
+                };
+
+                if success {
                     Ok(value)
                 } else {
                     Err(InterpreterError::runtime_error(
@@ -319,13 +334,23 @@ impl Interpreter {
                     _ => unreachable!(),
                 }
             }
-            Expr::Variable(name) => match self.env.borrow().get(&name.lexeme) {
-                Some(value) => Ok(value),
-                None => Err(InterpreterError::runtime_error(
-                    Some(name.clone()),
-                    &format!("Undefined variable '{}'.", name.lexeme),
-                )),
-            },
+            Expr::Variable(name) => self.lookup_variable(name),
+        }
+    }
+
+    fn lookup_variable(&self, name: &Token) -> Result<LoxType, InterpreterError> {
+        let opt_value = if let Some(distance) = self.locals.get(name) {
+            self.env.borrow().get_at(*distance, &name.lexeme)
+        } else {
+            self.globals.borrow().get(&name.lexeme)
+        };
+
+        match opt_value {
+            Some(value) => Ok(value),
+            None => Err(InterpreterError::runtime_error(
+                Some(name.clone()),
+                &format!("Undefined variable '{}'.", name.lexeme),
+            )),
         }
     }
 
