@@ -1,16 +1,26 @@
-use std::{collections::HashMap, fmt};
+use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
-use crate::{interpreter::InterpreterError, lox_type::LoxType, token::Token};
+use crate::{function::Function, interpreter::InterpreterError, lox_type::LoxType, token::Token};
 
 #[derive(Debug, Clone)]
 pub struct LoxClass {
     name: String,
+    methods: HashMap<String, Function>,
 }
 
 impl LoxClass {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &str, methods: HashMap<String, Function>) -> Self {
         Self {
             name: name.to_string(),
+            methods,
+        }
+    }
+
+    pub fn find_method(&self, name: &str) -> Option<Function> {
+        if self.methods.contains_key(name) {
+            self.methods.get(name).cloned()
+        } else {
+            None
         }
     }
 }
@@ -23,14 +33,14 @@ impl fmt::Display for LoxClass {
 
 #[derive(Debug, Clone)]
 pub struct LoxInstance {
-    class: LoxClass,
+    class: Rc<RefCell<LoxClass>>,
     fields: HashMap<String, LoxType>,
 }
 
 impl LoxInstance {
-    pub fn new(class: LoxClass) -> Self {
+    pub fn new(class: &Rc<RefCell<LoxClass>>) -> Self {
         Self {
-            class,
+            class: Rc::clone(class),
             fields: HashMap::new(),
         }
     }
@@ -38,6 +48,8 @@ impl LoxInstance {
     pub fn get(&self, name: &Token) -> Result<LoxType, InterpreterError> {
         if let Some(field) = self.fields.get(&name.lexeme) {
             Ok(field.clone())
+        } else if let Some(method) = self.class.borrow().find_method(&name.lexeme) {
+            Ok(LoxType::Callable(method))
         } else {
             Err(InterpreterError::runtime_error(
                 Some(name.clone()),
@@ -45,10 +57,14 @@ impl LoxInstance {
             ))
         }
     }
+
+    pub fn set(&mut self, name: &Token, value: LoxType) {
+        self.fields.insert(name.lexeme.to_string(), value);
+    }
 }
 
 impl fmt::Display for LoxInstance {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<instance {}>", self.class.name)
+        write!(f, "<instance {}>", self.class.borrow().name)
     }
 }

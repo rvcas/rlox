@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{cell::RefCell, fmt, rc::Rc};
 
 use crate::{
     class::{LoxClass, LoxInstance},
@@ -9,8 +9,8 @@ use crate::{
 pub enum LoxType {
     Boolean(bool),
     Callable(Function),
-    Class(LoxClass),
-    Instance(LoxInstance),
+    Class(Rc<RefCell<LoxClass>>),
+    Instance(Rc<RefCell<LoxInstance>>),
     Nil,
     Number(f64),
     String(String),
@@ -48,9 +48,9 @@ impl fmt::Display for LoxType {
 
         match self {
             Boolean(ref b) => write!(f, "{}", b),
-            Class(class) => write!(f, "{}", class),
+            Class(class) => write!(f, "{}", class.borrow_mut()),
             Callable(function) => write!(f, "{}", function),
-            Instance(instance) => write!(f, "{}", instance),
+            Instance(instance) => write!(f, "{}", instance.borrow_mut()),
             Nil => write!(f, "nil"),
             Number(ref n) => write!(f, "{}", n),
             String(ref s) => write!(f, "{}", s),

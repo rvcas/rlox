@@ -95,10 +95,32 @@ impl Interpreter {
                     Rc::new(RefCell::new(Environment::with_enclosing(&self.env))),
                 )?;
             }
-            Stmt::Class { name, .. } => {
+            Stmt::Class { name, methods } => {
                 self.env.borrow_mut().define(&name.lexeme, LoxType::Nil);
 
-                let class = LoxClass::new(&name.lexeme);
+                let mut class_methods = HashMap::new();
+
+                for method in methods {
+                    if let Stmt::Function {
+                        name: function_name,
+                        params,
+                        body,
+                    } = method
+                    {
+                        let function = Function::User {
+                            name: Box::new(function_name.clone()),
+                            params: params.clone(),
+                            body: body.clone(),
+                            closure: Rc::clone(&self.env),
+                        };
+
+                        class_methods.insert(function_name.lexeme.to_string(), function);
+                    } else {
+                        unreachable!()
+                    }
+                }
+
+                let class = Rc::new(RefCell::new(LoxClass::new(&name.lexeme, class_methods)));
 
                 self.env
                     .borrow_mut()
@@ -299,9 +321,9 @@ impl Interpreter {
                         }
                     }
                     LoxType::Class(class) => {
-                        let instance = LoxInstance::new(class);
+                        let instance = LoxInstance::new(&class);
 
-                        Ok(LoxType::Instance(instance))
+                        Ok(LoxType::Instance(Rc::new(RefCell::new(instance))))
                     }
                     _ => Err(InterpreterError::runtime_error(
                         Some(paren.clone()),
@@ -313,7 +335,7 @@ impl Interpreter {
                 let object_value = self.evaluate(object)?;
 
                 if let LoxType::Instance(instance) = object_value {
-                    Ok(instance.get(name)?)
+                    Ok(instance.borrow().get(name)?)
                 } else {
                     Err(InterpreterError::runtime_error(
                         Some(name.clone()),
@@ -343,6 +365,26 @@ impl Interpreter {
                 }
 
                 self.evaluate(right)
+            }
+            Expr::Set {
+                name,
+                object,
+                value,
+            } => {
+                let object_value = self.evaluate(object)?;
+
+                if let LoxType::Instance(instance) = object_value {
+                    let value = self.evaluate(value)?;
+
+                    instance.borrow_mut().set(name, value.clone());
+
+                    Ok(value)
+                } else {
+                    Err(InterpreterError::runtime_error(
+                        Some(name.clone()),
+                        "Only instances have fields.",
+                    ))
+                }
             }
             Expr::Unary { operator, right } => {
                 let right_value = self.evaluate(right)?;

@@ -10,4 +10,16 @@ class Bagel {}
 
 var bagel = Bagel();
 
+bagel.good = true;
+
 print bagel;
+
+print bagel.good;
+
+class Bacon {
+  eat() {
+    print "Crunch crunch crunch!";
+  }
+}
+
+Bacon().eat();

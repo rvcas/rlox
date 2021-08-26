@@ -11,6 +11,7 @@ use crate::{
 enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 pub struct Resolver<'a> {
@@ -43,9 +44,17 @@ impl<'a> Resolver<'a> {
 
                 self.end_scope();
             }
-            Stmt::Class { name, .. } => {
+            Stmt::Class { name, methods } => {
                 self.declare(name);
                 self.define(name);
+
+                for method in methods {
+                    if let Stmt::Function { body, params, .. } = method {
+                        let declaration = FunctionType::Method;
+
+                        self.resolve_function(params, body, declaration);
+                    }
+                }
             }
             Stmt::Expression(expr) => {
                 self.resolve_expression(expr);
@@ -128,6 +137,10 @@ impl<'a> Resolver<'a> {
             Expr::Logical { left, right, .. } => {
                 self.resolve_expression(left);
                 self.resolve_expression(right);
+            }
+            Expr::Set { object, value, .. } => {
+                self.resolve_expression(value);
+                self.resolve_expression(object);
             }
             Expr::Unary { right, .. } => {
                 self.resolve_expression(right);

@@ -272,6 +272,11 @@ impl Parser {
                     name,
                     value: Box::new(value),
                 }),
+                Expr::Get { name, object } => Ok(Expr::Set {
+                    object,
+                    name,
+                    value: Box::new(value),
+                }),
                 _ => Err(self.error(equals, "Invalid assignment target.")),
             }
         } else {
