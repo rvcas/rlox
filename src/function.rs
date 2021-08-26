@@ -61,6 +61,29 @@ impl Function {
             }
         }
     }
+
+    pub fn bind(&self, instance: LoxType) -> Self {
+        match self {
+            Self::User {
+                name,
+                params,
+                body,
+                closure,
+            } => {
+                let env = Rc::new(RefCell::new(Environment::with_enclosing(closure)));
+
+                env.borrow_mut().define("this", instance);
+
+                Self::User {
+                    name: name.clone(),
+                    params: params.clone(),
+                    body: body.clone(),
+                    closure: env,
+                }
+            }
+            Self::Native { .. } => unreachable!(),
+        }
+    }
 }
 
 impl fmt::Debug for Function {

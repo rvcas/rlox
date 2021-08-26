@@ -81,6 +81,8 @@ pub enum Expr {
         value: Box<Expr>,
     },
 
+    This(Token),
+
     Unary {
         operator: Token,
         right: Box<Expr>,

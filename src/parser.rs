@@ -445,6 +445,8 @@ impl Parser {
             && self.previous().literal.is_some()
         {
             Ok(Expr::Literal(self.previous().literal.unwrap()))
+        } else if self.matches(vec![TokenType::This]) {
+            Ok(Expr::This(self.previous()))
         } else if self.matches(vec![TokenType::Identifier]) {
             Ok(Expr::Variable(self.previous()))
         } else if self.matches(vec![TokenType::LeftParen]) {

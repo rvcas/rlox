@@ -45,11 +45,11 @@ impl LoxInstance {
         }
     }
 
-    pub fn get(&self, name: &Token) -> Result<LoxType, InterpreterError> {
+    pub fn get(&self, name: &Token, instance: &LoxType) -> Result<LoxType, InterpreterError> {
         if let Some(field) = self.fields.get(&name.lexeme) {
             Ok(field.clone())
         } else if let Some(method) = self.class.borrow().find_method(&name.lexeme) {
-            Ok(LoxType::Callable(method))
+            Ok(LoxType::Callable(method.bind(instance.clone())))
         } else {
             Err(InterpreterError::runtime_error(
                 Some(name.clone()),

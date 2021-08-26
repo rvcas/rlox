@@ -14,10 +14,16 @@ enum FunctionType {
     Method,
 }
 
+enum ClassType {
+    None,
+    Class,
+}
+
 pub struct Resolver<'a> {
     interpreter: &'a mut Interpreter,
     scopes: Vec<HashMap<String, bool>>,
     current_function: FunctionType,
+    current_class: ClassType,
 }
 
 impl<'a> Resolver<'a> {
@@ -26,6 +32,7 @@ impl<'a> Resolver<'a> {
             interpreter,
             scopes: Vec::new(),
             current_function: FunctionType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -45,8 +52,16 @@ impl<'a> Resolver<'a> {
                 self.end_scope();
             }
             Stmt::Class { name, methods } => {
+                let enclosing_class = mem::replace(&mut self.current_class, ClassType::Class);
+
                 self.declare(name);
                 self.define(name);
+
+                self.begin_scope();
+
+                if let Some(scope) = self.scopes.last_mut() {
+                    scope.insert("this".to_string(), true);
+                }
 
                 for method in methods {
                     if let Stmt::Function { body, params, .. } = method {
@@ -55,6 +70,10 @@ impl<'a> Resolver<'a> {
                         self.resolve_function(params, body, declaration);
                     }
                 }
+
+                self.current_class = enclosing_class;
+
+                self.end_scope();
             }
             Stmt::Expression(expr) => {
                 self.resolve_expression(expr);
@@ -141,6 +160,13 @@ impl<'a> Resolver<'a> {
             Expr::Set { object, value, .. } => {
                 self.resolve_expression(value);
                 self.resolve_expression(object);
+            }
+            Expr::This(keyword) => {
+                if let ClassType::None = self.current_class {
+                    lox::parse_error(keyword, "Can't use 'this' outside of a class.");
+                } else {
+                    self.resolve_local(keyword);
+                }
             }
             Expr::Unary { right, .. } => {
                 self.resolve_expression(right);

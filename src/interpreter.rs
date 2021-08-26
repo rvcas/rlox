@@ -334,8 +334,8 @@ impl Interpreter {
             Expr::Get { name, object } => {
                 let object_value = self.evaluate(object)?;
 
-                if let LoxType::Instance(instance) = object_value {
-                    Ok(instance.borrow().get(name)?)
+                if let LoxType::Instance(ref instance) = object_value {
+                    Ok(instance.borrow().get(name, &object_value)?)
                 } else {
                     Err(InterpreterError::runtime_error(
                         Some(name.clone()),
@@ -386,6 +386,7 @@ impl Interpreter {
                     ))
                 }
             }
+            Expr::This(keyword) => self.lookup_variable(keyword),
             Expr::Unary { operator, right } => {
                 let right_value = self.evaluate(right)?;
 
