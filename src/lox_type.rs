@@ -1,11 +1,16 @@
 use std::fmt;
 
-use crate::function::Function;
+use crate::{
+    class::{LoxClass, LoxInstance},
+    function::Function,
+};
 
 #[derive(Debug, Clone)]
 pub enum LoxType {
     Boolean(bool),
     Callable(Function),
+    Class(LoxClass),
+    Instance(LoxInstance),
     Nil,
     Number(f64),
     String(String),
@@ -43,10 +48,12 @@ impl fmt::Display for LoxType {
 
         match self {
             Boolean(ref b) => write!(f, "{}", b),
+            Class(class) => write!(f, "{}", class),
             Callable(function) => write!(f, "{}", function),
+            Instance(instance) => write!(f, "{}", instance),
+            Nil => write!(f, "nil"),
             Number(ref n) => write!(f, "{}", n),
             String(ref s) => write!(f, "{}", s),
-            Nil => write!(f, "nil"),
         }
     }
 }

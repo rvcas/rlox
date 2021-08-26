@@ -7,6 +7,7 @@ use std::{
 
 use crate::{
     ast::{Expr, Stmt},
+    class::{LoxClass, LoxInstance},
     environment::Environment,
     function::Function,
     lox,
@@ -93,6 +94,15 @@ impl Interpreter {
                     stmts,
                     Rc::new(RefCell::new(Environment::with_enclosing(&self.env))),
                 )?;
+            }
+            Stmt::Class { name, .. } => {
+                self.env.borrow_mut().define(&name.lexeme, LoxType::Nil);
+
+                let class = LoxClass::new(&name.lexeme);
+
+                self.env
+                    .borrow_mut()
+                    .assign(&name.lexeme, LoxType::Class(class));
             }
             Stmt::Expression(expr) => {
                 self.evaluate(expr)?;
@@ -288,10 +298,27 @@ impl Interpreter {
                             function.call(self, &arguments_values)
                         }
                     }
+                    LoxType::Class(class) => {
+                        let instance = LoxInstance::new(class);
+
+                        Ok(LoxType::Instance(instance))
+                    }
                     _ => Err(InterpreterError::runtime_error(
                         Some(paren.clone()),
                         "Can only call functions and classes.",
                     )),
+                }
+            }
+            Expr::Get { name, object } => {
+                let object_value = self.evaluate(object)?;
+
+                if let LoxType::Instance(instance) = object_value {
+                    Ok(instance.get(name)?)
+                } else {
+                    Err(InterpreterError::runtime_error(
+                        Some(name.clone()),
+                        "Only instances have properties.",
+                    ))
                 }
             }
             Expr::Grouping(grouped_expr) => self.evaluate(grouped_expr),

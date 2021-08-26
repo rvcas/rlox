@@ -33,13 +33,31 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Result<Stmt, ParseError> {
-        if self.matches(vec![TokenType::Fun]) {
+        if self.matches(vec![TokenType::Class]) {
+            self.class_declaration()
+        } else if self.matches(vec![TokenType::Fun]) {
             self.function("function")
         } else if self.matches(vec![TokenType::Var]) {
             self.var_declaration()
         } else {
             self.statement()
         }
+    }
+
+    fn class_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let name = self.consume(TokenType::Identifier, "Expect class name.")?;
+
+        self.consume(TokenType::LeftBrace, "Expect '{' before class body.")?;
+
+        let mut methods = Vec::new();
+
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            methods.push(self.function("method")?);
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after class body.")?;
+
+        Ok(Stmt::Class { name, methods })
     }
 
     fn function(&mut self, kind: &str) -> Result<Stmt, ParseError> {
@@ -395,6 +413,14 @@ impl Parser {
         loop {
             if self.matches(vec![TokenType::LeftParen]) {
                 expr = self.finish_call(expr)?;
+            } else if self.matches(vec![TokenType::Dot]) {
+                let name =
+                    self.consume(TokenType::Identifier, "Expect property name after '.'.")?;
+
+                expr = Expr::Get {
+                    object: Box::new(expr),
+                    name,
+                };
             } else {
                 break;
             }

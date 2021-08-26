@@ -43,6 +43,10 @@ impl<'a> Resolver<'a> {
 
                 self.end_scope();
             }
+            Stmt::Class { name, .. } => {
+                self.declare(name);
+                self.define(name);
+            }
             Stmt::Expression(expr) => {
                 self.resolve_expression(expr);
             }
@@ -113,6 +117,9 @@ impl<'a> Resolver<'a> {
                 for arg in arguments {
                     self.resolve_expression(arg);
                 }
+            }
+            Expr::Get { object, .. } => {
+                self.resolve_expression(object);
             }
             Expr::Grouping(group) => {
                 self.resolve_expression(group);

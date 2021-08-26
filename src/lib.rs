@@ -1,4 +1,5 @@
 mod ast;
+mod class;
 mod environment;
 mod function;
 mod interpreter;
