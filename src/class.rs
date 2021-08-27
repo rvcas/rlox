@@ -6,13 +6,19 @@ use crate::{function::Function, interpreter::InterpreterError, lox_type::LoxType
 pub struct LoxClass {
     name: String,
     methods: HashMap<String, Function>,
+    superclass: Option<Rc<RefCell<LoxClass>>>,
 }
 
 impl LoxClass {
-    pub fn new(name: &str, methods: HashMap<String, Function>) -> Self {
+    pub fn new(
+        name: &str,
+        methods: HashMap<String, Function>,
+        superclass: Option<Rc<RefCell<LoxClass>>>,
+    ) -> Self {
         Self {
             name: name.to_string(),
             methods,
+            superclass,
         }
     }
 
@@ -20,7 +26,11 @@ impl LoxClass {
         if self.methods.contains_key(name) {
             self.methods.get(name).cloned()
         } else {
-            None
+            if let Some(ref sc) = self.superclass {
+                sc.borrow().find_method(name)
+            } else {
+                None
+            }
         }
     }
 }

@@ -95,7 +95,27 @@ impl Interpreter {
                     Rc::new(RefCell::new(Environment::with_enclosing(&self.env))),
                 )?;
             }
-            Stmt::Class { name, methods } => {
+            Stmt::Class {
+                name,
+                methods,
+                opt_superclass,
+            } => {
+                let superclass_value = opt_superclass
+                    .as_ref()
+                    .map(|expr| {
+                        if let LoxType::Class(class) = self.evaluate(&expr)? {
+                            Ok(Rc::clone(&class))
+                        } else if let Expr::Variable(name) = expr {
+                            Err(InterpreterError::runtime_error(
+                                Some(name.clone()),
+                                "Superclass must be a class.",
+                            ))
+                        } else {
+                            unreachable!();
+                        }
+                    })
+                    .transpose()?;
+
                 self.env.borrow_mut().define(&name.lexeme, LoxType::Nil);
 
                 let mut class_methods = HashMap::new();
@@ -121,7 +141,11 @@ impl Interpreter {
                     }
                 }
 
-                let class = Rc::new(RefCell::new(LoxClass::new(&name.lexeme, class_methods)));
+                let class = Rc::new(RefCell::new(LoxClass::new(
+                    &name.lexeme,
+                    class_methods,
+                    superclass_value,
+                )));
 
                 self.env
                     .borrow_mut()

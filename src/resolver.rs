@@ -52,11 +52,23 @@ impl<'a> Resolver<'a> {
 
                 self.end_scope();
             }
-            Stmt::Class { name, methods } => {
+            Stmt::Class {
+                name,
+                methods,
+                opt_superclass,
+            } => {
                 let enclosing_class = mem::replace(&mut self.current_class, ClassType::Class);
 
                 self.declare(name);
                 self.define(name);
+
+                if let Some(Expr::Variable(superclass_name)) = opt_superclass {
+                    if name.lexeme == superclass_name.lexeme {
+                        lox::parse_error(superclass_name, "A class can't inherit from itself.");
+                    }
+
+                    self.resolve_local(superclass_name);
+                }
 
                 self.begin_scope();
 
