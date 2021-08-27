@@ -47,3 +47,19 @@ class Thing {
 
 var callback = Thing().getCallback();
 callback();
+
+class Person {
+  init() {
+    print "I'm initializing";
+
+    this.name = "rvcas";
+  }
+
+  greet() {
+    print "yoo, I'm " + this.name + ".";
+  }
+}
+
+var me = Person();
+
+me.greet();

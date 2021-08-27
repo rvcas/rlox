@@ -19,6 +19,7 @@ pub enum Function {
         params: Vec<Token>,
         body: Vec<Stmt>,
         closure: Rc<RefCell<Environment>>,
+        is_initializer: bool,
     },
 }
 
@@ -45,6 +46,7 @@ impl Function {
                 body,
                 params,
                 closure,
+                is_initializer,
                 ..
             } => {
                 let env = Rc::new(RefCell::new(Environment::with_enclosing(closure)));
@@ -54,8 +56,34 @@ impl Function {
                 }
 
                 match interpreter.execute_block(body, env) {
-                    Ok(()) => Ok(LoxType::Nil),
-                    Err(InterpreterError::Return(value)) => Ok(value),
+                    Ok(()) => {
+                        if *is_initializer {
+                            if let Some(value) = closure.borrow().get_at(0, "this") {
+                                Ok(value)
+                            } else {
+                                Err(InterpreterError::runtime_error(
+                                    None,
+                                    "expect initializer to return this",
+                                ))
+                            }
+                        } else {
+                            Ok(LoxType::Nil)
+                        }
+                    }
+                    Err(InterpreterError::Return(value)) => {
+                        if *is_initializer {
+                            if let Some(value) = closure.borrow().get_at(0, "this") {
+                                Ok(value)
+                            } else {
+                                Err(InterpreterError::runtime_error(
+                                    None,
+                                    "expect initializer to return this",
+                                ))
+                            }
+                        } else {
+                            Ok(value)
+                        }
+                    }
                     Err(err) => Err(err),
                 }
             }
@@ -69,6 +97,7 @@ impl Function {
                 params,
                 body,
                 closure,
+                is_initializer,
             } => {
                 let env = Rc::new(RefCell::new(Environment::with_enclosing(closure)));
 
@@ -79,6 +108,7 @@ impl Function {
                     params: params.clone(),
                     body: body.clone(),
                     closure: env,
+                    is_initializer: *is_initializer,
                 }
             }
             Self::Native { .. } => unreachable!(),

@@ -112,6 +112,7 @@ impl Interpreter {
                             params: params.clone(),
                             body: body.clone(),
                             closure: Rc::clone(&self.env),
+                            is_initializer: name.lexeme == "init",
                         };
 
                         class_methods.insert(function_name.lexeme.to_string(), function);
@@ -135,6 +136,7 @@ impl Interpreter {
                     body: body.to_vec(),
                     params: params.to_vec(),
                     closure: Rc::clone(&self.env),
+                    is_initializer: false,
                 });
 
                 self.env.borrow_mut().define(&name.lexeme, function);
@@ -307,7 +309,9 @@ impl Interpreter {
 
                 match callee_value {
                     LoxType::Callable(function) => {
-                        if arguments_values.len() != function.arity() {
+                        if arguments_values.len() == function.arity() {
+                            function.call(self, &arguments_values)
+                        } else {
                             Err(InterpreterError::runtime_error(
                                 Some(paren.clone()),
                                 &format!(
@@ -316,14 +320,30 @@ impl Interpreter {
                                     arguments_values.len()
                                 ),
                             ))
-                        } else {
-                            function.call(self, &arguments_values)
                         }
                     }
                     LoxType::Class(class) => {
                         let instance = LoxInstance::new(&class);
+                        let instance_type = LoxType::Instance(Rc::new(RefCell::new(instance)));
 
-                        Ok(LoxType::Instance(Rc::new(RefCell::new(instance))))
+                        if let Some(initializer) = class.borrow().find_method("init") {
+                            if arguments_values.len() == initializer.arity() {
+                                initializer
+                                    .bind(instance_type.clone())
+                                    .call(self, &arguments_values)?;
+                            } else {
+                                return Err(InterpreterError::runtime_error(
+                                    Some(paren.clone()),
+                                    &format!(
+                                        "Expected {} arguments but got {}.",
+                                        initializer.arity(),
+                                        arguments_values.len()
+                                    ),
+                                ));
+                            }
+                        }
+
+                        Ok(instance_type)
                     }
                     _ => Err(InterpreterError::runtime_error(
                         Some(paren.clone()),

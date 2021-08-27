@@ -9,14 +9,15 @@ use crate::{
 
 #[derive(Clone)]
 enum FunctionType {
-    None,
     Function,
+    Initializer,
     Method,
+    None,
 }
 
 enum ClassType {
-    None,
     Class,
+    None,
 }
 
 pub struct Resolver<'a> {
@@ -64,8 +65,15 @@ impl<'a> Resolver<'a> {
                 }
 
                 for method in methods {
-                    if let Stmt::Function { body, params, .. } = method {
-                        let declaration = FunctionType::Method;
+                    if let Stmt::Function {
+                        body, params, name, ..
+                    } = method
+                    {
+                        let mut declaration = FunctionType::Method;
+
+                        if name.lexeme == "init" {
+                            declaration = FunctionType::Initializer;
+                        }
 
                         self.resolve_function(params, body, declaration);
                     }
@@ -106,6 +114,10 @@ impl<'a> Resolver<'a> {
                 }
 
                 if !value.is_nil() {
+                    if let FunctionType::Initializer = self.current_function {
+                        lox::parse_error(keyword, "Can't return a value from an initializer.");
+                    }
+
                     self.resolve_expression(value);
                 }
             }
