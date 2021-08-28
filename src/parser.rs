@@ -457,6 +457,14 @@ impl Parser {
             && self.previous().literal.is_some()
         {
             Ok(Expr::Literal(self.previous().literal.unwrap()))
+        } else if self.matches(vec![TokenType::Super]) {
+            let keyword = self.previous();
+
+            self.consume(TokenType::Dot, "Expect '.' after 'super'.")?;
+
+            let method = self.consume(TokenType::Identifier, "Expect superclass method name.")?;
+
+            Ok(Expr::Super { keyword, method })
         } else if self.matches(vec![TokenType::This]) {
             Ok(Expr::This(self.previous()))
         } else if self.matches(vec![TokenType::Identifier]) {

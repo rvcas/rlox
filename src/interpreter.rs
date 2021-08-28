@@ -118,6 +118,14 @@ impl Interpreter {
 
                 self.env.borrow_mut().define(&name.lexeme, LoxType::Nil);
 
+                if let Some(ref superclass) = superclass_value {
+                    self.env = Rc::new(RefCell::new(Environment::with_enclosing(&self.env)));
+
+                    self.env
+                        .borrow_mut()
+                        .define("super", LoxType::Class(Rc::clone(superclass)));
+                }
+
                 let mut class_methods = HashMap::new();
 
                 for method in methods {
@@ -144,8 +152,14 @@ impl Interpreter {
                 let class = Rc::new(RefCell::new(LoxClass::new(
                     &name.lexeme,
                     class_methods,
-                    superclass_value,
+                    superclass_value.clone(),
                 )));
+
+                if superclass_value.is_some() {
+                    let parent = self.env.borrow().enclosing.clone().unwrap();
+
+                    self.env = parent;
+                }
 
                 self.env
                     .borrow_mut()
@@ -427,6 +441,29 @@ impl Interpreter {
                     Err(InterpreterError::runtime_error(
                         Some(name.clone()),
                         "Only instances have fields.",
+                    ))
+                }
+            }
+            Expr::Super { keyword, method } => {
+                let distance = self.locals.get(keyword).unwrap();
+
+                let opt_superclass = self.env.borrow().get_at(*distance, "super");
+
+                let instance = self.env.borrow().get_at(*distance - 1, "this").unwrap();
+
+                if let Some(LoxType::Class(ref superclass)) = opt_superclass {
+                    if let Some(function) = superclass.borrow().find_method(&method.lexeme) {
+                        Ok(LoxType::Callable(function.bind(instance)))
+                    } else {
+                        Err(InterpreterError::runtime_error(
+                            Some(method.clone()),
+                            &format!("Undefined property '{}'.", method.lexeme),
+                        ))
+                    }
+                } else {
+                    Err(InterpreterError::runtime_error(
+                        Some(method.clone()),
+                        &format!("Undefined property '{}'.", keyword.lexeme),
                     ))
                 }
             }

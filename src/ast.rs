@@ -82,6 +82,11 @@ pub enum Expr {
         value: Box<Expr>,
     },
 
+    Super {
+        keyword: Token,
+        method: Token,
+    },
+
     This(Token),
 
     Unary {

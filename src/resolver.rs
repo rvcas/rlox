@@ -68,6 +68,12 @@ impl<'a> Resolver<'a> {
                     }
 
                     self.resolve_local(superclass_name);
+
+                    self.begin_scope();
+
+                    if let Some(scope) = self.scopes.last_mut() {
+                        scope.insert("super".to_string(), true);
+                    }
                 }
 
                 self.begin_scope();
@@ -91,9 +97,13 @@ impl<'a> Resolver<'a> {
                     }
                 }
 
-                self.current_class = enclosing_class;
-
                 self.end_scope();
+
+                if opt_superclass.is_some() {
+                    self.end_scope();
+                }
+
+                self.current_class = enclosing_class;
             }
             Stmt::Expression(expr) => {
                 self.resolve_expression(expr);
@@ -184,6 +194,9 @@ impl<'a> Resolver<'a> {
             Expr::Set { object, value, .. } => {
                 self.resolve_expression(value);
                 self.resolve_expression(object);
+            }
+            Expr::Super { keyword, .. } => {
+                self.resolve_local(keyword);
             }
             Expr::This(keyword) => {
                 if let ClassType::None = self.current_class {
