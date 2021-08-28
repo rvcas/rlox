@@ -18,6 +18,7 @@ enum FunctionType {
 enum ClassType {
     Class,
     None,
+    SubClass,
 }
 
 pub struct Resolver<'a> {
@@ -66,6 +67,8 @@ impl<'a> Resolver<'a> {
                     if name.lexeme == superclass_name.lexeme {
                         lox::parse_error(superclass_name, "A class can't inherit from itself.");
                     }
+
+                    self.current_class = ClassType::SubClass;
 
                     self.resolve_local(superclass_name);
 
@@ -196,6 +199,19 @@ impl<'a> Resolver<'a> {
                 self.resolve_expression(object);
             }
             Expr::Super { keyword, .. } => {
+                match self.current_class {
+                    ClassType::None => {
+                        lox::parse_error(keyword, "Can't use 'super' outside of a class.");
+                    }
+                    ClassType::Class => {
+                        lox::parse_error(
+                            keyword,
+                            "Can't use 'super' in a class with no superclass.",
+                        );
+                    }
+                    ClassType::SubClass => (),
+                };
+
                 self.resolve_local(keyword);
             }
             Expr::This(keyword) => {
